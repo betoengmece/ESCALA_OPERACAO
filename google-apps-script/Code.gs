@@ -112,7 +112,8 @@ function json(data) {
 }
 
 function ss() {
-  if (SPREADSHEET_ID) return SpreadsheetApp.openById(SPREADSHEET_ID);
+  const configuredId = spreadsheetIdFrom(SPREADSHEET_ID);
+  if (configuredId) return SpreadsheetApp.openById(configuredId);
   const active = SpreadsheetApp.getActiveSpreadsheet();
   if (active) return active;
   const props = PropertiesService.getScriptProperties();
@@ -121,6 +122,13 @@ function ss() {
   const created = SpreadsheetApp.create("ESCALA_OPERACAO_DADOS");
   props.setProperty("OPERATIONS_SPREADSHEET_ID", created.getId());
   return created;
+}
+
+function spreadsheetIdFrom(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const match = text.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : text;
 }
 
 function setup() {
