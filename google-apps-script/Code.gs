@@ -112,7 +112,15 @@ function json(data) {
 }
 
 function ss() {
-  return SPREADSHEET_ID ? SpreadsheetApp.openById(SPREADSHEET_ID) : SpreadsheetApp.getActiveSpreadsheet();
+  if (SPREADSHEET_ID) return SpreadsheetApp.openById(SPREADSHEET_ID);
+  const active = SpreadsheetApp.getActiveSpreadsheet();
+  if (active) return active;
+  const props = PropertiesService.getScriptProperties();
+  const existingId = props.getProperty("OPERATIONS_SPREADSHEET_ID");
+  if (existingId) return SpreadsheetApp.openById(existingId);
+  const created = SpreadsheetApp.create("ESCALA_OPERACAO_DADOS");
+  props.setProperty("OPERATIONS_SPREADSHEET_ID", created.getId());
+  return created;
 }
 
 function setup() {
