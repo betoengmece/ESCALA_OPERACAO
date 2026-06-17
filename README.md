@@ -16,6 +16,16 @@ http://127.0.0.1:8000
 
 Na primeira execução o app cria `data/operations.db` com dados iniciais importados do esboço da planilha.
 
+## Senha opcional
+
+Para exigir senha, rode o app com a variável `APP_PASSWORD`:
+
+```bash
+APP_PASSWORD="sua-senha-forte" python3 server.py
+```
+
+Em hospedagem, configure `APP_PASSWORD` como variável de ambiente do servidor. Não coloque a senha direto no código nem envie para o GitHub.
+
 ## O que está incluído
 
 - Agenda por período, operação, local e pessoa.

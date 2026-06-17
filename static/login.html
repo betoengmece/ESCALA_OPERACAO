@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entrar - Planejamento de Operações</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="login-page">
+  <main class="login-box">
+    <h1>Planejamento de Operações</h1>
+    <p>Acesso restrito</p>
+    <form id="loginForm" class="login-form">
+      <label>Senha <input id="password" type="password" autofocus required></label>
+      <button class="primary" type="submit">Entrar</button>
+      <div id="loginMessage" class="login-message"></div>
+    </form>
+  </main>
+  <script>
+    document.getElementById("loginForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const message = document.getElementById("loginMessage");
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: document.getElementById("password").value }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        message.textContent = data.error || "Não foi possível entrar.";
+        return;
+      }
+      window.location.href = "/";
+    });
+  </script>
+</body>
+</html>

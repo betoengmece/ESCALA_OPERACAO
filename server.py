@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import hashlib
 import sqlite3
 from datetime import datetime, timedelta
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -10,6 +11,11 @@ from urllib.parse import parse_qs, urlparse
 ROOT = Path(__file__).resolve().parent
 DB_PATH = ROOT / "data" / "operations.db"
 STATIC_DIR = ROOT / "static"
+SESSION_COOKIE = "operations_session"
+
+
+def auth_cookie_value(password):
+    return hashlib.sha256(f"operations-planner:{password}".encode("utf-8")).hexdigest()
 
 PEOPLE = [
     "ADALBERTO", "OMAR", "BRENO", "ANDRADE", "BOA VENTURA", "PVR1", "PVR2",
@@ -374,12 +380,24 @@ def validate_operation(db, payload, operation_id=None):
 
 
 class Handler(SimpleHTTPRequestHandler):
+    def is_authenticated(self):
+        password = os.environ.get("APP_PASSWORD", "")
+        if not password:
+            return True
+        cookies = self.headers.get("Cookie", "")
+        return f"{SESSION_COOKIE}={auth_cookie_value(password)}" in cookies
+
     def translate_path(self, path):
         parsed = urlparse(path)
         if parsed.path.startswith("/api/"):
             return str(ROOT)
+        if parsed.path == "/login.html":
+            return str(STATIC_DIR / "login.html")
         rel = parsed.path.lstrip("/") or "index.html"
         return str(STATIC_DIR / rel)
+
+    def do_HEAD(self):
+        return self.do_GET()
 
     def send_json(self, data, status=200):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
@@ -389,6 +407,11 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def redirect_login(self):
+        self.send_response(302)
+        self.send_header("Location", "/login.html")
+        self.end_headers()
+
     def read_json(self):
         length = int(self.headers.get("Content-Length", "0"))
         if not length:
@@ -397,8 +420,12 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
+        if parsed.path != "/login.html" and not parsed.path.startswith("/api/") and not self.is_authenticated():
+            return self.redirect_login()
         if not parsed.path.startswith("/api/"):
             return super().do_GET()
+        if parsed.path != "/api/login" and not self.is_authenticated():
+            return self.send_json({"error": "Não autorizado."}, 401)
         try:
             with connect() as db:
                 self.route_get(db, parsed)
@@ -407,6 +434,10 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
+        if parsed.path == "/api/login":
+            return self.handle_login(self.read_json())
+        if not self.is_authenticated():
+            return self.send_json({"error": "Não autorizado."}, 401)
         try:
             with connect() as db:
                 self.route_post(db, parsed, self.read_json())
@@ -415,6 +446,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_PUT(self):
         parsed = urlparse(self.path)
+        if not self.is_authenticated():
+            return self.send_json({"error": "Não autorizado."}, 401)
         try:
             with connect() as db:
                 self.route_put(db, parsed, self.read_json())
@@ -423,11 +456,27 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_DELETE(self):
         parsed = urlparse(self.path)
+        if not self.is_authenticated():
+            return self.send_json({"error": "Não autorizado."}, 401)
         try:
             with connect() as db:
                 self.route_delete(db, parsed)
         except Exception as exc:
             self.send_json({"error": str(exc)}, 500)
+
+    def handle_login(self, payload):
+        password = os.environ.get("APP_PASSWORD", "")
+        if not password:
+            return self.send_json({"ok": True})
+        if payload.get("password") != password:
+            return self.send_json({"error": "Senha incorreta."}, 401)
+        body = json.dumps({"ok": True}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Set-Cookie", f"{SESSION_COOKIE}={auth_cookie_value(password)}; Path=/; SameSite=Lax")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def route_get(self, db, parsed):
         path = parsed.path
