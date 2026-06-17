@@ -58,8 +58,15 @@ async function api(path, options = {}) {
     fetchOptions.headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   }
   const res = await fetch(url, fetchOptions);
-  const data = await res.json();
+  const text = await res.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (err) {
+    throw new Error("O Apps Script retornou uma página HTML em vez de JSON. Verifique a implantação: ela precisa estar como Aplicativo da Web e acessível para quem usa o app.");
+  }
   if (!res.ok && !data.warnings) throw new Error(data.error || "Erro na requisição");
+  if (data.error) throw new Error(data.error);
   return data;
 }
 
@@ -534,5 +541,11 @@ document.addEventListener("click", (event) => {
 });
 
 bootstrap().catch((err) => {
-  document.body.innerHTML = `<main><h1>Erro ao iniciar</h1><p>${escapeHtml(err.message)}</p></main>`;
+  const panel = $("apiSetup");
+  if (panel) {
+    panel.style.display = "grid";
+    panel.insertAdjacentHTML("beforeend", `<div class="warnings">${escapeHtml(err.message)}</div>`);
+  } else {
+    document.body.innerHTML = `<main><h1>Erro ao iniciar</h1><p>${escapeHtml(err.message)}</p></main>`;
+  }
 });
