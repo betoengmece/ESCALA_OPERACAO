@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Planejamento de Operações</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <strong>Operações</strong>
+      <span>Planejamento local</span>
+    </div>
+    <nav>
+      <button class="nav active" data-view="agenda">Agenda</button>
+      <button class="nav" data-view="schedule">Escala</button>
+      <button class="nav" data-view="new">Nova operação</button>
+      <button class="nav" data-view="models">Modelos</button>
+      <button class="nav" data-view="people">Pessoas</button>
+      <button class="nav" data-view="resources">Recursos</button>
+      <button class="nav" data-view="execution">Execução</button>
+    </nav>
+  </aside>
+
+  <main>
+    <section id="view-agenda" class="view active">
+      <header class="page-head">
+        <div>
+          <h1>Agenda operacional</h1>
+          <p>Operações planejadas com alertas de equipe e recursos.</p>
+        </div>
+        <button id="refreshBtn" class="primary">Atualizar</button>
+      </header>
+      <div class="toolbar">
+        <label>Início <input id="filterStart" type="date"></label>
+        <label>Fim <input id="filterEnd" type="date"></label>
+        <label>Operação <select id="filterModel"><option value="">Todas</option></select></label>
+        <label>Pessoa <select id="filterPerson"><option value="">Todas</option></select></label>
+      </div>
+      <div id="agendaList" class="operation-grid"></div>
+    </section>
+
+    <section id="view-schedule" class="view">
+      <header class="page-head">
+        <div>
+          <h1>Escala pessoal</h1>
+          <p>Onde cada pessoa está escalada, com conflitos e folga mínima de 12h.</p>
+        </div>
+        <button id="scheduleRefreshBtn" class="primary">Atualizar</button>
+      </header>
+      <div class="toolbar">
+        <label>Início <input id="scheduleStart" type="date"></label>
+        <label>Fim <input id="scheduleEnd" type="date"></label>
+        <label>Pessoa <select id="schedulePerson"><option value="">Todas</option></select></label>
+        <label>Status <select id="scheduleStatus"><option value="">Todos</option><option value="issues">Com alerta</option><option value="assigned">Com escala</option></select></label>
+      </div>
+      <div id="personScheduleList" class="schedule-list"></div>
+    </section>
+
+    <section id="view-new" class="view">
+      <header class="page-head">
+        <div>
+          <h1>Nova operação</h1>
+          <p>Escolha o modelo, equipe e horário. O app valida antes de salvar.</p>
+        </div>
+      </header>
+      <form id="operationForm" class="editor">
+        <div class="form-grid">
+          <label>Modelo <select id="modelSelect" required></select></label>
+          <label>Data <input id="opDate" type="date" required></label>
+          <label>Hora inicial <input id="opStart" type="time" required value="09:00"></label>
+          <label>Hora final <input id="opEnd" type="time" required value="19:00"></label>
+          <label>Local <input id="opLocation" placeholder="ALFANDEGA"></label>
+          <label>Nº pessoas <input id="plannedPeople" type="number" min="1" value="1" required></label>
+        </div>
+        <div class="split">
+          <section>
+            <h2>Equipe</h2>
+            <div id="peoplePicker" class="picker"></div>
+          </section>
+          <section>
+            <h2>Recursos calculados</h2>
+            <div id="resourceEditor" class="resource-editor"></div>
+          </section>
+        </div>
+        <section>
+          <h2>Alertas</h2>
+          <div id="warningBox" class="warnings muted">Preencha os dados para validar.</div>
+          <label class="full">Justificativa para salvar com alertas
+            <textarea id="justification" rows="3" placeholder="Obrigatória se houver conflito ou falta de recurso."></textarea>
+          </label>
+        </section>
+        <div class="actions">
+          <button type="button" id="validateBtn">Validar</button>
+          <button class="primary" type="submit">Salvar operação</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="view-models" class="view">
+      <header class="page-head"><div><h1>Modelos</h1><p>Tipos de operação importados do esboço da planilha.</p></div></header>
+      <div id="modelsList" class="list"></div>
+    </section>
+
+    <section id="view-people" class="view">
+      <header class="page-head"><div><h1>Pessoas</h1><p>Servidores disponíveis para escala.</p></div></header>
+      <form id="addPersonForm" class="inline-form">
+        <label>Nova pessoa <input id="newPersonName" placeholder="NOME"></label>
+        <label>Grupo <input id="newPersonGroup" placeholder="Equipe_24x72"></label>
+        <button class="primary" type="submit">Adicionar</button>
+      </form>
+      <div id="peopleList" class="table"></div>
+    </section>
+
+    <section id="view-resources" class="view">
+      <header class="page-head"><div><h1>Recursos</h1><p>Estoque total usado nas validações de simultaneidade.</p></div></header>
+      <div id="resourcesList" class="table"></div>
+    </section>
+
+    <section id="view-execution" class="view">
+      <header class="page-head">
+        <div>
+          <h1>Execução</h1>
+          <p>Ficha pronta para consulta ou impressão.</p>
+        </div>
+        <select id="executionSelect"></select>
+      </header>
+      <article id="executionSheet" class="execution-sheet"></article>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
