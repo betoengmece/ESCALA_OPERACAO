@@ -10,6 +10,7 @@ const state = {
 const $ = (id) => document.getElementById(id);
 const DEFAULT_REMOTE_API_URL = "https://script.google.com/macros/s/AKfycbwHN8ApnIya9OuP1yrXsOFoqIRT6sZjOz4hZsM9IVZB_TE-7PerYuJ_x6JW-sdJpMT1kQ/exec";
 const REMOTE_API_URL = cleanApiUrl(localStorage.getItem("operations_api_url") || DEFAULT_REMOTE_API_URL);
+const REMOTE_ACCESS_KEY = String(localStorage.getItem("operations_access_key") || "").trim();
 
 function cleanApiUrl(value) {
   return String(value || "").trim().split("?")[0];
@@ -47,6 +48,7 @@ async function api(path, options = {}) {
     const params = new URLSearchParams(query);
     const requestedMethod = options.method || "GET";
     params.set("route", route.replace(/^\/api\/?/, ""));
+    if (REMOTE_ACCESS_KEY) params.set("access_key", REMOTE_ACCESS_KEY);
     if (requestedMethod !== "GET" && requestedMethod !== "POST") {
       params.set("_method", requestedMethod);
     }
@@ -89,7 +91,8 @@ function initApiSetup() {
   const input = $("apiUrlInput");
   if (!panel || !input) return;
   input.value = REMOTE_API_URL;
-  panel.style.display = REMOTE_API_URL ? "none" : "grid";
+  $("apiAccessKeyInput").value = REMOTE_ACCESS_KEY;
+  panel.style.display = "grid";
 }
 
 async function reloadData() {
@@ -516,6 +519,7 @@ $("saveApiUrlBtn").addEventListener("click", () => {
   const value = cleanApiUrl($("apiUrlInput").value);
   if (!value) return;
   localStorage.setItem("operations_api_url", value);
+  localStorage.setItem("operations_access_key", $("apiAccessKeyInput").value.trim());
   window.location.reload();
 });
 $("scheduleRefreshBtn").addEventListener("click", loadPersonSchedule);

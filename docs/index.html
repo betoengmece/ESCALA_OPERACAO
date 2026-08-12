@@ -26,11 +26,12 @@
   <main>
     <section id="view-agenda" class="view active">
       <div id="apiSetup" class="setup-panel">
-        <strong>Conectar ao Google Apps Script</strong>
-        <p>Cole a URL do Web App do Apps Script para usar o Google Sheets como base de dados.</p>
+        <strong>Conexão e chave de acesso</strong>
+        <p>Use a URL do Web App e a chave definida no Apps Script. A chave fica somente neste navegador.</p>
         <div class="setup-row">
           <input id="apiUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
-          <button id="saveApiUrlBtn" class="primary" type="button">Salvar URL</button>
+          <input id="apiAccessKeyInput" type="password" autocomplete="current-password" placeholder="Chave de acesso (se configurada)">
+          <button id="saveApiUrlBtn" class="primary" type="button">Salvar acesso</button>
         </div>
       </div>
       <header class="page-head">

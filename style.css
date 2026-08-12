@@ -57,7 +57,7 @@ body.login-page {
 }
 .setup-row {
   display: grid;
-  grid-template-columns: 1fr 130px;
+  grid-template-columns: 1fr 1fr 130px;
   gap: 10px;
 }
 

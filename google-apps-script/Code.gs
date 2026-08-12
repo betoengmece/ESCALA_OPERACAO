@@ -1,5 +1,6 @@
 const SPREADSHEET_ID = ""; // Opcional: cole o ID da planilha. Vazio = usa a planilha vinculada ao script.
 const ALLOWED_EMAILS = []; // Opcional: ["pessoa@gmail.com"]. Vazio = libera quem tiver acesso ao Web App.
+const ACCESS_KEY = ""; // Opcional: defina uma chave longa aqui. Vazio = desativa a exigência de chave.
 
 const SHEETS = {
   people: ["id", "name", "active", "groups", "notes"],
@@ -54,7 +55,7 @@ function doPost(e) {
 
 function handle(e, body) {
   try {
-    assertAccess();
+    assertAccess(e.parameter.access_key || "");
     setup();
     const route = (e.parameter.route || "bootstrap").replace(/^\/+/, "");
     const result = dispatch(route, e.parameter, body || {});
@@ -64,10 +65,15 @@ function handle(e, body) {
   }
 }
 
-function assertAccess() {
-  if (!ALLOWED_EMAILS.length) return;
-  const email = Session.getActiveUser().getEmail();
-  if (!email || ALLOWED_EMAILS.indexOf(email) === -1) throw new Error("Acesso não autorizado.");
+function assertAccess(accessKey) {
+  const configuredKey = String(ACCESS_KEY || "").trim();
+  if (configuredKey && accessKey !== configuredKey) {
+    throw new Error("Chave de acesso inválida.");
+  }
+  if (ALLOWED_EMAILS.length) {
+    const email = Session.getActiveUser().getEmail();
+    if (!email || ALLOWED_EMAILS.indexOf(email) === -1) throw new Error("Acesso não autorizado.");
+  }
 }
 
 function dispatch(route, params, body) {
