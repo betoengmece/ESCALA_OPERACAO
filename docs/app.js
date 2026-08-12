@@ -259,7 +259,11 @@ function operationWarnings(payload, excludedId) {
 function decorateOperation(op) {
   const model = state.models.find((item) => Number(item.id) === Number(op.model_id)) || {};
   const people = (op.people || []).map((person) => state.people.find((item) => Number(item.id) === Number(person.id)) || person);
-  const item = { ...op, model_name: model.name || op.model_name, min_people: model.min_people, recommended_people: model.recommended_people, general_notes: model.general_notes, procedure: model.procedure, people };
+  const resources = (op.resources || []).map((resource) => {
+    const registered = state.resources.find((item) => Number(item.id) === Number(resource.id));
+    return { ...registered, ...resource, name: registered?.name || resource.name || "Recurso não encontrado" };
+  });
+  const item = { ...op, model_name: model.name || op.model_name, min_people: model.min_people, recommended_people: model.recommended_people, general_notes: model.general_notes, procedure: model.procedure, people, resources };
   item.warnings = operationWarnings(item, item.id);
   return item;
 }
