@@ -9,7 +9,11 @@ const state = {
 
 const $ = (id) => document.getElementById(id);
 const DEFAULT_REMOTE_API_URL = "https://script.google.com/macros/s/AKfycbwHN8ApnIya9OuP1yrXsOFoqIRT6sZjOz4hZsM9IVZB_TE-7PerYuJ_x6JW-sdJpMT1kQ/exec";
-const REMOTE_API_URL = localStorage.getItem("operations_api_url") || DEFAULT_REMOTE_API_URL;
+const REMOTE_API_URL = cleanApiUrl(localStorage.getItem("operations_api_url") || DEFAULT_REMOTE_API_URL);
+
+function cleanApiUrl(value) {
+  return String(value || "").trim().split("?")[0];
+}
 
 function today(offset = 0) {
   const d = new Date();
@@ -509,7 +513,7 @@ $("filterPerson").addEventListener("change", renderAgenda);
 $("executionSelect").addEventListener("change", renderExecution);
 $("addPersonForm").addEventListener("submit", addPerson);
 $("saveApiUrlBtn").addEventListener("click", () => {
-  const value = $("apiUrlInput").value.trim();
+  const value = cleanApiUrl($("apiUrlInput").value);
   if (!value) return;
   localStorage.setItem("operations_api_url", value);
   window.location.reload();
