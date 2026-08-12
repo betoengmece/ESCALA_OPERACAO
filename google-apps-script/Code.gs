@@ -80,6 +80,8 @@ function dispatch(route, params, body) {
   const method = (params._method || "").toUpperCase();
   const effectiveMethod = method || (Object.keys(body || {}).length ? "POST" : "GET");
   if (route === "bootstrap") return bootstrapPayload();
+  if (route === "snapshot" && effectiveMethod === "GET") return { ...bootstrapPayload(), operations: listOperations("1900-01-01T00:00", "2999-12-31T23:59") };
+  if (route === "snapshot" && effectiveMethod === "POST") return replaceSnapshot(body);
   if (route === "calculate") return getOperationResources(Number(params.model_id), Number(params.people || 1));
   if (route === "operations" && effectiveMethod === "GET") return listOperations(params.start || "1900-01-01T00:00", params.end || "2999-12-31T23:59");
   if (route === "operations/validate") return { warnings: validateOperation(body, null) };
@@ -226,6 +228,38 @@ function normalize(field, value) {
 
 function bootstrapPayload() {
   return { people: rows("people").sort(byName), resources: rows("resources").sort(byName), models: modelsPayload() };
+}
+
+function replaceRows(name, items) {
+  const sh = sheet(name);
+  sh.clearContents();
+  sh.getRange(1, 1, 1, SHEETS[name].length).setValues([SHEETS[name]]);
+  if (items.length) sh.getRange(2, 1, items.length, SHEETS[name].length).setValues(items.map(item => SHEETS[name].map(key => item[key] === undefined ? "" : item[key])));
+}
+
+function replaceSnapshot(body) {
+  const people = body.people || [];
+  const resources = body.resources || [];
+  const models = body.models || [];
+  const operations = body.operations || [];
+  const modelResources = [];
+  const operationPeople = [];
+  const resourceOverrides = [];
+  models.forEach(model => (model.resources || []).forEach(resource => modelResources.push({
+    id: Number(resource.model_resource_id), model_id: Number(model.id), resource_id: Number(resource.id), rule_type: resource.rule_type, amount: Number(resource.amount)
+  })));
+  operations.forEach(operation => {
+    (operation.people || []).forEach(person => operationPeople.push({ operation_id: Number(operation.id), person_id: Number(person.id) }));
+    (operation.resources || []).forEach(resource => resourceOverrides.push({ operation_id: Number(operation.id), resource_id: Number(resource.id), quantity: Number(resource.quantity) }));
+  });
+  replaceRows("people", people);
+  replaceRows("resources", resources);
+  replaceRows("models", models);
+  replaceRows("model_resources", modelResources);
+  replaceRows("operations", operations);
+  replaceRows("operation_people", operationPeople);
+  replaceRows("operation_resource_overrides", resourceOverrides);
+  return { ok: true };
 }
 
 function byName(a, b) {

@@ -33,13 +33,18 @@
           <input id="apiAccessKeyInput" type="password" autocomplete="current-password" placeholder="Chave de acesso (se configurada)">
           <button id="saveApiUrlBtn" class="primary" type="button">Salvar acesso</button>
         </div>
+        <div class="sync-row">
+          <button id="downloadCloudBtn" type="button">Baixar da nuvem</button>
+          <button id="uploadCloudBtn" class="primary" type="button">Enviar para a nuvem</button>
+          <span id="syncStatus" class="muted">Dados locais neste navegador.</span>
+        </div>
       </div>
       <header class="page-head">
         <div>
           <h1>Agenda operacional</h1>
           <p>Operações planejadas com alertas de equipe e recursos.</p>
         </div>
-        <button id="refreshBtn" class="primary">Atualizar</button>
+        <button id="refreshBtn" class="primary">Atualizar visão</button>
       </header>
       <div class="toolbar">
         <label>Início <input id="filterStart" type="date"></label>

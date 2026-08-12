@@ -11,6 +11,7 @@ const $ = (id) => document.getElementById(id);
 const DEFAULT_REMOTE_API_URL = "https://script.google.com/macros/s/AKfycbwHN8ApnIya9OuP1yrXsOFoqIRT6sZjOz4hZsM9IVZB_TE-7PerYuJ_x6JW-sdJpMT1kQ/exec";
 const REMOTE_API_URL = cleanApiUrl(localStorage.getItem("operations_api_url") || DEFAULT_REMOTE_API_URL);
 const REMOTE_ACCESS_KEY = String(localStorage.getItem("operations_access_key") || "").trim();
+const LOCAL_DATA_KEY = "operations_local_snapshot_v1";
 
 function cleanApiUrl(value) {
   return String(value || "").trim().split("?")[0];
@@ -83,7 +84,13 @@ async function bootstrap() {
   $("scheduleStart").value = today(-7);
   $("scheduleEnd").value = today(30);
   $("opDate").value = today();
-  await reloadData();
+  const cached = loadLocalData();
+  if (cached) {
+    Object.assign(state, cached);
+    refreshViews();
+  } else {
+    await downloadFromCloud();
+  }
 }
 
 function initApiSetup() {
@@ -96,15 +103,50 @@ function initApiSetup() {
 }
 
 async function reloadData() {
-  const data = await api("/api/bootstrap");
-  Object.assign(state, data);
+  refreshViews();
+}
+
+function loadLocalData() {
+  try { return JSON.parse(localStorage.getItem(LOCAL_DATA_KEY) || "null"); } catch (_) { return null; }
+}
+
+function saveLocalData() {
+  localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify({ people: state.people, resources: state.resources, models: state.models, operations: state.operations }));
+  updateSyncStatus();
+}
+
+function updateSyncStatus(message) {
+  const el = $("syncStatus");
+  if (el) el.textContent = message || `Dados locais: ${new Date().toLocaleString("pt-BR")}`;
+}
+
+function refreshViews() {
   renderSelectors();
   renderPeoplePicker();
   renderModels();
   renderPeople();
   renderResources();
-  await calculateResources();
-  await loadOperations();
+  calculateResources();
+  loadOperations();
+  updateSyncStatus();
+}
+
+async function downloadFromCloud() {
+  if (state.operations.length && !confirm("Baixar da nuvem substituirá os dados locais deste navegador. Continuar?")) return;
+  const data = await api("/api/snapshot");
+  Object.assign(state, data, { calculatedResources: [], personSchedule: [] });
+  saveLocalData();
+  refreshViews();
+  updateSyncStatus("Dados baixados da nuvem agora.");
+}
+
+async function uploadToCloud() {
+  if (!confirm("Enviar estes dados locais substituirá a cópia atual da nuvem. Continuar?")) return;
+  await api("/api/snapshot", {
+    method: "POST",
+    body: JSON.stringify({ people: state.people, resources: state.resources, models: state.models, operations: state.operations }),
+  });
+  updateSyncStatus("Dados locais enviados para a nuvem agora.");
 }
 
 function renderSelectors() {
@@ -125,10 +167,15 @@ function renderPeoplePicker() {
   `).join("");
 }
 
-async function calculateResources() {
+function calculateResources() {
   const modelId = $("modelSelect").value;
-  const people = $("plannedPeople").value || 1;
-  state.calculatedResources = await api(`/api/calculate?model_id=${modelId}&people=${people}`);
+  const people = Number($("plannedPeople").value || 1);
+  const model = state.models.find((item) => String(item.id) === String(modelId));
+  state.calculatedResources = (model?.resources || []).map((resource) => ({
+    ...resource,
+    stock: Number(state.resources.find((item) => Number(item.id) === Number(resource.id))?.quantity || 0),
+    quantity: resource.rule_type === "per_people_divisor" ? Math.ceil(people / Number(resource.amount || 1)) : Number(resource.amount || 0),
+  }));
   $("resourceEditor").innerHTML = state.calculatedResources.map((r) => `
     <div class="resource-row">
       <div>
@@ -176,49 +223,97 @@ function renderWarnings(warnings) {
   box.innerHTML = warnings.map((w) => `<div>${escapeHtml(w.message)}</div>`).join("");
 }
 
-async function validateCurrent() {
-  const result = await api("/api/operations/validate", {
-    method: "POST",
-    body: JSON.stringify(buildPayload()),
-  });
-  renderWarnings(result.warnings);
-  return result.warnings;
+function overlaps(aStart, aEnd, bStart, bEnd) {
+  return aStart < bEnd && aEnd > bStart;
 }
 
-async function saveOperation(event) {
-  event.preventDefault();
-  const result = await api("/api/operations", {
-    method: "POST",
-    body: JSON.stringify(buildPayload()),
+function restHours(aStart, aEnd, bStart, bEnd) {
+  const as = new Date(aStart), ae = new Date(aEnd), bs = new Date(bStart), be = new Date(bEnd);
+  if (be <= as) return (as - be) / 36e5;
+  if (ae <= bs) return (bs - ae) / 36e5;
+  return null;
+}
+
+function operationWarnings(payload, excludedId) {
+  const model = state.models.find((item) => Number(item.id) === Number(payload.model_id));
+  const warnings = [];
+  const people = payload.people_ids || (payload.people || []).map((person) => Number(person.id));
+  if (Number(payload.planned_people) < Number(model?.min_people || 0)) warnings.push({ message: `${model?.name || "Este modelo"} precisa de no mínimo ${model?.min_people || 0} pessoas.` });
+  if (people.length !== Number(payload.planned_people)) warnings.push({ message: `Quantidade planejada (${payload.planned_people}) difere da equipe escalada (${people.length}).` });
+  people.forEach((personId) => {
+    const person = state.people.find((item) => Number(item.id) === Number(personId));
+    state.operations.filter((op) => Number(op.id) !== Number(excludedId) && (op.people || []).some((item) => Number(item.id) === Number(personId))).forEach((op) => {
+      if (overlaps(payload.starts_at, payload.ends_at, op.starts_at, op.ends_at)) warnings.push({ message: `${person?.name || "Pessoa"} já está em ${op.model_name} no mesmo intervalo.` });
+      const rest = restHours(payload.starts_at, payload.ends_at, op.starts_at, op.ends_at);
+      if (rest !== null && rest < 12) warnings.push({ message: `${person?.name || "Pessoa"} terá apenas ${rest.toFixed(1)}h de folga em relação a ${op.model_name}. Mínimo: 12h.` });
+    });
   });
-  if (result.error) {
-    renderWarnings(result.warnings);
+  (payload.resources || []).forEach((resource) => {
+    const stock = Number(state.resources.find((item) => Number(item.id) === Number(resource.id))?.quantity || 0);
+    const used = state.operations.filter((op) => Number(op.id) !== Number(excludedId) && overlaps(payload.starts_at, payload.ends_at, op.starts_at, op.ends_at)).reduce((total, op) => total + Number((op.resources || []).find((item) => Number(item.id) === Number(resource.id))?.quantity || 0), 0);
+    if (used + Number(resource.quantity || 0) > stock) warnings.push({ message: `Falta ${used + Number(resource.quantity || 0) - stock} ${resource.name} no intervalo. Estoque: ${stock}, já reservado: ${used}, necessário: ${resource.quantity}.` });
+  });
+  return warnings;
+}
+
+function decorateOperation(op) {
+  const model = state.models.find((item) => Number(item.id) === Number(op.model_id)) || {};
+  const people = (op.people || []).map((person) => state.people.find((item) => Number(item.id) === Number(person.id)) || person);
+  const item = { ...op, model_name: model.name || op.model_name, min_people: model.min_people, recommended_people: model.recommended_people, general_notes: model.general_notes, procedure: model.procedure, people };
+  item.warnings = operationWarnings(item, item.id);
+  return item;
+}
+
+function validateCurrent() {
+  const warnings = operationWarnings(buildPayload());
+  renderWarnings(warnings);
+  return warnings;
+}
+
+function saveOperation(event) {
+  event.preventDefault();
+  const payload = buildPayload();
+  const warnings = operationWarnings(payload);
+  if (warnings.length && !payload.justification) {
+    renderWarnings(warnings);
     $("justification").focus();
     return;
   }
+  const id = state.operations.reduce((max, op) => Math.max(max, Number(op.id || 0)), 0) + 1;
+  state.operations.push(decorateOperation({ ...payload, id, people: payload.people_ids.map((personId) => state.people.find((person) => Number(person.id) === personId)), created_at: new Date().toISOString(), status: "planejada" }));
+  saveLocalData();
   $("operationForm").reset();
   $("opDate").value = today();
   $("opStart").value = "09:00";
   $("opEnd").value = "19:00";
   renderPeoplePicker();
-  await calculateResources();
-  await loadOperations();
+  calculateResources();
+  loadOperations();
   switchView("agenda");
 }
 
-async function loadOperations() {
+function loadOperations() {
   const start = `${$("filterStart").value || "1900-01-01"}T00:00`;
   const end = `${$("filterEnd").value || "2999-12-31"}T23:59`;
-  state.operations = await api(`/api/operations?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`);
+  state.operations = state.operations.map(decorateOperation);
   renderAgenda();
   renderExecutionSelect();
-  await loadPersonSchedule();
+  loadPersonSchedule(start, end);
 }
 
-async function loadPersonSchedule() {
-  const start = `${$("scheduleStart").value || $("filterStart").value || "1900-01-01"}T00:00`;
-  const end = `${$("scheduleEnd").value || $("filterEnd").value || "2999-12-31"}T23:59`;
-  state.personSchedule = await api(`/api/person-schedule?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`);
+function loadPersonSchedule(defaultStart, defaultEnd) {
+  const start = defaultStart || `${$("scheduleStart").value || $("filterStart").value || "1900-01-01"}T00:00`;
+  const end = defaultEnd || `${$("scheduleEnd").value || $("filterEnd").value || "2999-12-31"}T23:59`;
+  state.personSchedule = state.people.map((person) => {
+    const assignments = state.operations.filter((op) => (op.people || []).some((item) => Number(item.id) === Number(person.id)) && op.starts_at < end && op.ends_at > start).map((op) => ({ operation_id: op.id, model_name: op.model_name, starts_at: op.starts_at, ends_at: op.ends_at, location: op.location }));
+    const issues = [];
+    assignments.forEach((a, index) => assignments.slice(index + 1).forEach((b) => {
+      if (overlaps(a.starts_at, a.ends_at, b.starts_at, b.ends_at)) issues.push({ message: `Conflito simultâneo: ${a.model_name} e ${b.model_name}.` });
+      const rest = restHours(a.starts_at, a.ends_at, b.starts_at, b.ends_at);
+      if (rest !== null && rest < 12) issues.push({ message: `Folga de ${rest.toFixed(1)}h entre ${a.model_name} e ${b.model_name}.` });
+    }));
+    return { ...person, assignments, issues };
+  });
   renderPersonSchedule();
 }
 
@@ -366,103 +461,103 @@ function valuesFrom(container) {
   return data;
 }
 
-async function addPerson(event) {
+function addPerson(event) {
   event.preventDefault();
-  await api("/api/people", {
-    method: "POST",
-    body: JSON.stringify({
-      name: $("newPersonName").value,
-      groups: $("newPersonGroup").value,
-      active: 1,
-    }),
-  });
+  state.people.push({ id: state.people.reduce((max, person) => Math.max(max, Number(person.id || 0)), 0) + 1, name: $("newPersonName").value.trim().toUpperCase(), groups: $("newPersonGroup").value.trim(), active: 1, notes: "" });
   $("addPersonForm").reset();
-  await reloadData();
+  saveLocalData();
+  reloadData();
 }
 
-async function savePerson(id) {
+function savePerson(id) {
   const row = document.querySelector(`#peopleList [data-id="${id}"]`);
-  await api(`/api/people/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(valuesFrom(row)),
-  });
-  await reloadData();
+  Object.assign(state.people.find((person) => Number(person.id) === Number(id)), valuesFrom(row));
+  state.people.find((person) => Number(person.id) === Number(id)).active = Number(state.people.find((person) => Number(person.id) === Number(id)).active);
+  saveLocalData();
+  reloadData();
 }
 
-async function saveResource(id) {
+function saveResource(id) {
   const row = document.querySelector(`#resourcesList [data-id="${id}"]`);
-  await api(`/api/resources/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(valuesFrom(row)),
-  });
-  await reloadData();
+  const resource = state.resources.find((item) => Number(item.id) === Number(id));
+  Object.assign(resource, valuesFrom(row));
+  resource.name = resource.name.trim().toUpperCase();
+  resource.quantity = Number(resource.quantity || 0);
+  saveLocalData();
+  reloadData();
 }
 
-async function saveModel(id) {
+function saveModel(id) {
   const row = document.querySelector(`#modelsList [data-id="${id}"]`);
-  await api(`/api/models/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(valuesFrom(row)),
-  });
-  await reloadData();
+  const model = state.models.find((item) => Number(item.id) === Number(id));
+  Object.assign(model, valuesFrom(row));
+  model.name = model.name.trim().toUpperCase();
+  model.min_people = Number(model.min_people || 0);
+  model.recommended_people = Number(model.recommended_people || 0);
+  saveLocalData();
+  reloadData();
 }
 
-async function saveModelResource(id) {
+function saveModelResource(id) {
   const row = document.querySelector(`[data-model-resource="${id}"]`);
-  await api(`/api/model-resources/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(valuesFrom(row)),
-  });
-  await reloadData();
+  const resource = state.models.flatMap((model) => model.resources || []).find((item) => Number(item.model_resource_id) === Number(id));
+  Object.assign(resource, valuesFrom(row));
+  resource.amount = Number(resource.amount || 0);
+  saveLocalData();
+  reloadData();
 }
 
-async function addModelResource(modelId) {
+function addModelResource(modelId) {
   const row = document.querySelector(`[data-model-add="${modelId}"]`);
   try {
-    await api(`/api/models/${modelId}/resources`, {
-      method: "POST",
-      body: JSON.stringify({
-        resource_id: row.querySelector("[data-new-resource]").value,
-        rule_type: row.querySelector("[data-new-rule]").value,
-        amount: row.querySelector("[data-new-amount]").value,
-      }),
-    });
-    await reloadData();
+    const model = state.models.find((item) => Number(item.id) === Number(modelId));
+    const resourceId = Number(row.querySelector("[data-new-resource]").value);
+    if ((model.resources || []).some((item) => Number(item.id) === resourceId)) throw new Error("Este recurso já está no modelo.");
+    const resource = state.resources.find((item) => Number(item.id) === resourceId);
+    model.resources.push({ model_resource_id: state.models.flatMap((item) => item.resources || []).reduce((max, item) => Math.max(max, Number(item.model_resource_id || 0)), 0) + 1, id: resourceId, name: resource.name, stock: Number(resource.quantity), rule_type: row.querySelector("[data-new-rule]").value, amount: Number(row.querySelector("[data-new-amount]").value), quantity: 0 });
+    saveLocalData();
+    reloadData();
   } catch (err) {
     alert(err.message);
   }
 }
 
-async function deleteOperation(id) {
+function deleteOperation(id) {
   if (!confirm("Excluir esta operação?")) return;
-  await api(`/api/operations/${id}`, { method: "DELETE" });
-  await loadOperations();
+  state.operations = state.operations.filter((operation) => Number(operation.id) !== Number(id));
+  saveLocalData();
+  loadOperations();
 }
 
-async function deleteResource(id) {
+function deleteResource(id) {
   if (!confirm("Excluir este recurso? Se ele estiver em uso por algum modelo, o app vai bloquear.")) return;
   try {
-    await api(`/api/resources/${id}`, { method: "DELETE" });
-    await reloadData();
+    if (state.models.some((model) => (model.resources || []).some((resource) => Number(resource.id) === Number(id)))) throw new Error("Recurso em uso. Remova-o dos modelos antes de excluir.");
+    state.resources = state.resources.filter((resource) => Number(resource.id) !== Number(id));
+    saveLocalData();
+    reloadData();
   } catch (err) {
     alert(err.message);
   }
 }
 
-async function deletePerson(id) {
+function deletePerson(id) {
   if (!confirm("Excluir esta pessoa? Se ela estiver em alguma operação, o app vai bloquear.")) return;
   try {
-    await api(`/api/people/${id}`, { method: "DELETE" });
-    await reloadData();
+    if (state.operations.some((operation) => (operation.people || []).some((person) => Number(person.id) === Number(id)))) throw new Error("Pessoa em uso em operação. Remova-a das operações ou marque como inativa.");
+    state.people = state.people.filter((person) => Number(person.id) !== Number(id));
+    saveLocalData();
+    reloadData();
   } catch (err) {
     alert(err.message);
   }
 }
 
-async function deleteModelResource(id) {
+function deleteModelResource(id) {
   if (!confirm("Remover este recurso deste modelo de operação?")) return;
-  await api(`/api/model-resources/${id}`, { method: "DELETE" });
-  await reloadData();
+  state.models.forEach((model) => { model.resources = (model.resources || []).filter((resource) => Number(resource.model_resource_id) !== Number(id)); });
+  saveLocalData();
+  reloadData();
 }
 
 function renderExecutionSelect() {
@@ -509,6 +604,8 @@ $("plannedPeople").addEventListener("input", calculateResources);
 $("validateBtn").addEventListener("click", validateCurrent);
 $("operationForm").addEventListener("submit", saveOperation);
 $("refreshBtn").addEventListener("click", loadOperations);
+$("downloadCloudBtn").addEventListener("click", () => downloadFromCloud().catch((err) => alert(err.message)));
+$("uploadCloudBtn").addEventListener("click", () => uploadToCloud().catch((err) => alert(err.message)));
 $("filterStart").addEventListener("change", loadOperations);
 $("filterEnd").addEventListener("change", loadOperations);
 $("filterModel").addEventListener("change", renderAgenda);
