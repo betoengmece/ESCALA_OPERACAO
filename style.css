@@ -71,6 +71,8 @@ body.login-page {
 .brand strong { font-size: 22px; }
 .brand span { color: #b7c7c0; font-size: 13px; }
 nav { display: grid; gap: 8px; }
+.sidebar-sync { margin-top: 20px; padding-top: 18px; border-top: 1px solid rgba(217, 231, 225, .22); }
+.sidebar-sync button { width: 100%; }
 .nav {
   text-align: left;
   border: 0;

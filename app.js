@@ -648,6 +648,7 @@ $("operationForm").addEventListener("submit", saveOperation);
 $("refreshBtn").addEventListener("click", loadOperations);
 $("downloadCloudBtn").addEventListener("click", () => downloadFromCloud().catch((err) => alert(err.message)));
 $("uploadCloudBtn").addEventListener("click", () => uploadToCloud().catch((err) => alert(err.message)));
+$("uploadCloudSidebarBtn").addEventListener("click", () => uploadToCloud().catch((err) => alert(err.message)));
 $("filterStart").addEventListener("change", loadOperations);
 $("filterEnd").addEventListener("change", loadOperations);
 $("filterModel").addEventListener("change", renderAgenda);
