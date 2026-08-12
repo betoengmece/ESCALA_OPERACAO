@@ -114,6 +114,12 @@
 
     <section id="view-models" class="view">
       <header class="page-head"><div><h1>Modelos</h1><p>Tipos de operação importados do esboço da planilha.</p></div></header>
+      <form id="addModelForm" class="inline-form">
+        <label>Novo modelo <input id="newModelName" placeholder="EX.: OPERACAO NOTURNA" required></label>
+        <label>Mínimo de pessoas <input id="newModelMinPeople" type="number" min="1" value="1" required></label>
+        <label>Recomendado <input id="newModelRecommendedPeople" type="number" min="1" value="1" required></label>
+        <button class="primary" type="submit">Adicionar modelo</button>
+      </form>
       <div id="modelsList" class="list"></div>
     </section>
 

@@ -386,7 +386,10 @@ function renderModels() {
           <button type="button" data-add-model-resource="${m.id}">Adicionar recurso</button>
         </div>
       </section>
-      <div class="actions compact"><button type="button" data-save-model="${m.id}" class="primary">Salvar modelo</button></div>
+      <div class="actions compact">
+        <button type="button" data-save-model="${m.id}" class="primary">Salvar modelo</button>
+        <button type="button" data-delete-model="${m.id}" class="danger">Excluir modelo</button>
+      </div>
     </article>
   `).join("");
 }
@@ -498,6 +501,41 @@ function saveModel(id) {
   model.name = model.name.trim().toUpperCase();
   model.min_people = Number(model.min_people || 0);
   model.recommended_people = Number(model.recommended_people || 0);
+  saveLocalData();
+  reloadData();
+}
+
+function addModel(event) {
+  event.preventDefault();
+  const name = $("newModelName").value.trim().toUpperCase();
+  if (state.models.some((model) => model.name === name)) {
+    alert("Já existe um modelo com este nome.");
+    return;
+  }
+  state.models.push({
+    id: state.models.reduce((max, model) => Math.max(max, Number(model.id || 0)), 0) + 1,
+    name,
+    min_people: Number($("newModelMinPeople").value),
+    recommended_people: Number($("newModelRecommendedPeople").value),
+    general_notes: "",
+    procedure: "",
+    resources: [],
+  });
+  $("addModelForm").reset();
+  $("newModelMinPeople").value = 1;
+  $("newModelRecommendedPeople").value = 1;
+  saveLocalData();
+  reloadData();
+}
+
+function deleteModel(id) {
+  const model = state.models.find((item) => Number(item.id) === Number(id));
+  if (state.operations.some((operation) => Number(operation.model_id) === Number(id))) {
+    alert(`Não é possível excluir ${model?.name || "este modelo"} porque ele já aparece em operações registradas.`);
+    return;
+  }
+  if (!confirm(`Excluir o modelo ${model?.name || "selecionado"}?`)) return;
+  state.models = state.models.filter((item) => Number(item.id) !== Number(id));
   saveLocalData();
   reloadData();
 }
@@ -616,6 +654,7 @@ $("filterModel").addEventListener("change", renderAgenda);
 $("filterPerson").addEventListener("change", renderAgenda);
 $("executionSelect").addEventListener("change", renderExecution);
 $("addPersonForm").addEventListener("submit", addPerson);
+$("addModelForm").addEventListener("submit", addModel);
 $("saveApiUrlBtn").addEventListener("click", () => {
   const value = cleanApiUrl($("apiUrlInput").value);
   if (!value) return;
@@ -638,6 +677,7 @@ document.addEventListener("click", (event) => {
   const deleteResourceId = event.target.dataset.deleteResource;
   const deleteModelResourceId = event.target.dataset.deleteModelResource;
   const deletePersonId = event.target.dataset.deletePerson;
+  const deleteModelId = event.target.dataset.deleteModel;
   if (personId) savePerson(personId);
   if (resourceId) saveResource(resourceId);
   if (modelId) saveModel(modelId);
@@ -647,6 +687,7 @@ document.addEventListener("click", (event) => {
   if (deleteResourceId) deleteResource(deleteResourceId);
   if (deleteModelResourceId) deleteModelResource(deleteModelResourceId);
   if (deletePersonId) deletePerson(deletePersonId);
+  if (deleteModelId) deleteModel(deleteModelId);
 });
 
 bootstrap().catch((err) => {
