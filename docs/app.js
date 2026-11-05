@@ -5,6 +5,7 @@ const state = {
   operations: [],
   calculatedResources: [],
   personSchedule: [],
+  editingOperationId: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -190,8 +191,8 @@ function calculateResources() {
 function buildPayload() {
   const date = $("opDate").value;
   const start = `${date}T${$("opStart").value}`;
-  let endDate = date;
-  if ($("opEnd").value <= $("opStart").value) {
+  let endDate = $("opEndDate").value || date;
+  if (!$("opEndDate").value && $("opEnd").value <= $("opStart").value) {
     const d = new Date(`${date}T00:00`);
     d.setDate(d.getDate() + 1);
     endDate = d.toISOString().slice(0, 10);
@@ -251,7 +252,7 @@ function operationWarnings(payload, excludedId) {
   (payload.resources || []).forEach((resource) => {
     const stock = Number(state.resources.find((item) => Number(item.id) === Number(resource.id))?.quantity || 0);
     const used = state.operations.filter((op) => Number(op.id) !== Number(excludedId) && overlaps(payload.starts_at, payload.ends_at, op.starts_at, op.ends_at)).reduce((total, op) => total + Number((op.resources || []).find((item) => Number(item.id) === Number(resource.id))?.quantity || 0), 0);
-    if (used + Number(resource.quantity || 0) > stock) warnings.push({ message: `Falta ${used + Number(resource.quantity || 0) - stock} ${resource.name} no intervalo. Estoque: ${stock}, já reservado: ${used}, necessário: ${resource.quantity}.` });
+    if (used + Number(resource.quantity || 0) > stock) warnings.push({ message: `Falta ${used + Number(resource.quantity || 0) - stock} ${state.resources.find((item) => Number(item.id) === Number(resource.id))?.name || resource.name || "recurso"} no intervalo. Estoque: ${stock}, já reservado: ${used}, necessário: ${resource.quantity}.` });
   });
   return warnings;
 }
@@ -269,29 +270,89 @@ function decorateOperation(op) {
 }
 
 function validateCurrent() {
-  const warnings = operationWarnings(buildPayload());
+  const warnings = operationWarnings(buildPayload(), state.editingOperationId);
   renderWarnings(warnings);
   return warnings;
+}
+
+function resetOperationForm() {
+  state.editingOperationId = null;
+  $("operationForm").reset();
+  $("opDate").value = today();
+  $("opEndDate").value = "";
+  $("opStart").value = "09:00";
+  $("opEnd").value = "19:00";
+  $("operationTitle").textContent = "Nova operação";
+  $("saveOperationBtn").textContent = "Salvar operação";
+  $("cancelEditBtn").hidden = true;
+  $("warningBox").className = "warnings muted";
+  $("warningBox").textContent = "Preencha os dados para validar.";
+  renderPeoplePicker();
+  calculateResources();
+}
+
+function editOperation(id) {
+  const op = state.operations.find((item) => Number(item.id) === Number(id));
+  if (!op) return;
+  if (!state.models.some((model) => Number(model.id) === Number(op.model_id))) {
+    alert("O modelo desta operação não foi encontrado. Verifique os dados antes de editar.");
+    return;
+  }
+  state.editingOperationId = op.id;
+  $("modelSelect").value = String(op.model_id);
+  $("opDate").value = String(op.starts_at).slice(0, 10);
+  $("opStart").value = String(op.starts_at).slice(11, 16);
+  $("opEndDate").value = String(op.ends_at).slice(0, 10);
+  $("opEnd").value = String(op.ends_at).slice(11, 16);
+  $("opLocation").value = op.location || "";
+  $("plannedPeople").value = op.planned_people;
+  $("justification").value = op.justification || "";
+  renderPeoplePicker();
+  document.querySelectorAll(".person-check").forEach((el) => {
+    el.checked = (op.people || []).some((person) => Number(person.id) === Number(el.value));
+  });
+  calculateResources();
+  // Preserve saved resource quantities, including resources removed from the model later.
+  (op.resources || []).forEach((resource) => {
+    let input = [...document.querySelectorAll("#resourceEditor input")].find((el) => Number(el.dataset.resource) === Number(resource.id));
+    if (!input) {
+      $("resourceEditor").insertAdjacentHTML("beforeend", `<div class="resource-row"><div><strong>${escapeHtml(resource.name || "Recurso não encontrado")}</strong><div class="muted">Recurso salvo na operação</div></div><input type="number" min="0" data-resource="${Number(resource.id)}"></div>`);
+      input = $("resourceEditor").lastElementChild.querySelector("input");
+    }
+    input.value = resource.quantity;
+  });
+  $("operationTitle").textContent = "Editar operação";
+  $("saveOperationBtn").textContent = "Salvar alterações";
+  $("cancelEditBtn").hidden = false;
+  validateCurrent();
+  switchView("new");
+  window.scrollTo(0, 0);
 }
 
 function saveOperation(event) {
   event.preventDefault();
   const payload = buildPayload();
-  const warnings = operationWarnings(payload);
+  if (payload.ends_at <= payload.starts_at) {
+    alert("A data e o horário final devem ser posteriores ao início da operação.");
+    return;
+  }
+  const warnings = operationWarnings(payload, state.editingOperationId);
   if (warnings.length && !payload.justification) {
     renderWarnings(warnings);
     $("justification").focus();
     return;
   }
-  const id = state.operations.reduce((max, op) => Math.max(max, Number(op.id || 0)), 0) + 1;
-  state.operations.push(decorateOperation({ ...payload, id, people: payload.people_ids.map((personId) => state.people.find((person) => Number(person.id) === personId)), created_at: new Date().toISOString(), status: "planejada" }));
+  const people = payload.people_ids.map((personId) => state.people.find((person) => Number(person.id) === personId)).filter(Boolean);
+  if (state.editingOperationId !== null) {
+    const index = state.operations.findIndex((op) => Number(op.id) === Number(state.editingOperationId));
+    if (index < 0) { alert("A operação não foi encontrada. Atualize a agenda e tente novamente."); return; }
+    state.operations[index] = decorateOperation({ ...state.operations[index], ...payload, people });
+  } else {
+    const id = state.operations.reduce((max, op) => Math.max(max, Number(op.id || 0)), 0) + 1;
+    state.operations.push(decorateOperation({ ...payload, id, people, created_at: new Date().toISOString(), status: "planejada" }));
+  }
   saveLocalData();
-  $("operationForm").reset();
-  $("opDate").value = today();
-  $("opStart").value = "09:00";
-  $("opEnd").value = "19:00";
-  renderPeoplePicker();
-  calculateResources();
+  resetOperationForm();
   loadOperations();
   switchView("agenda");
 }
@@ -344,6 +405,7 @@ function renderAgenda() {
       <div class="chips">${op.resources.filter((r) => r.quantity > 0).map((r) => `<span class="chip">${r.quantity} ${escapeHtml(r.name)}</span>`).join("")}</div>
       <div class="card-actions">
         ${op.justification ? `<span class="badge warn">Justificado</span>` : "<span></span>"}
+        <button type="button" data-edit-operation="${op.id}">Editar</button>
         <button type="button" class="danger" data-delete-operation="${op.id}">Excluir</button>
       </div>
     </article>
@@ -640,7 +702,11 @@ function switchView(view) {
   document.querySelectorAll(".view").forEach((el) => el.classList.toggle("active", el.id === `view-${view}`));
 }
 
-document.querySelectorAll(".nav").forEach((btn) => btn.addEventListener("click", () => switchView(btn.dataset.view)));
+document.querySelectorAll(".nav").forEach((btn) => btn.addEventListener("click", () => {
+  if (btn.dataset.view === "new" && state.editingOperationId !== null) resetOperationForm();
+  switchView(btn.dataset.view);
+}));
+$("cancelEditBtn").addEventListener("click", () => { resetOperationForm(); switchView("agenda"); });
 $("modelSelect").addEventListener("change", calculateResources);
 $("plannedPeople").addEventListener("input", calculateResources);
 $("validateBtn").addEventListener("click", validateCurrent);
@@ -674,6 +740,7 @@ document.addEventListener("click", (event) => {
   const modelId = event.target.dataset.saveModel;
   const modelResourceId = event.target.dataset.saveModelResource;
   const addModelResourceId = event.target.dataset.addModelResource;
+  const editOperationId = event.target.dataset.editOperation;
   const deleteOperationId = event.target.dataset.deleteOperation;
   const deleteResourceId = event.target.dataset.deleteResource;
   const deleteModelResourceId = event.target.dataset.deleteModelResource;
@@ -684,6 +751,7 @@ document.addEventListener("click", (event) => {
   if (modelId) saveModel(modelId);
   if (modelResourceId) saveModelResource(modelResourceId);
   if (addModelResourceId) addModelResource(addModelResourceId);
+  if (editOperationId) editOperation(editOperationId);
   if (deleteOperationId) deleteOperation(deleteOperationId);
   if (deleteResourceId) deleteResource(deleteResourceId);
   if (deleteModelResourceId) deleteModelResource(deleteModelResourceId);

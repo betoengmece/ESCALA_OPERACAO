@@ -78,7 +78,7 @@
     <section id="view-new" class="view">
       <header class="page-head">
         <div>
-          <h1>Nova operação</h1>
+          <h1 id="operationTitle">Nova operação</h1>
           <p>Escolha o modelo, equipe e horário. O app valida antes de salvar.</p>
         </div>
       </header>
@@ -88,6 +88,7 @@
           <label>Data <input id="opDate" type="date" required></label>
           <label>Hora inicial <input id="opStart" type="time" required value="09:00"></label>
           <label>Hora final <input id="opEnd" type="time" required value="19:00"></label>
+          <label>Data final (opcional) <input id="opEndDate" type="date"><small>Em branco: mesmo dia ou dia seguinte, conforme o horário.</small></label>
           <label>Local <input id="opLocation" placeholder="ALFANDEGA"></label>
           <label>Nº pessoas <input id="plannedPeople" type="number" min="1" value="1" required></label>
         </div>
@@ -110,7 +111,8 @@
         </section>
         <div class="actions">
           <button type="button" id="validateBtn">Validar</button>
-          <button class="primary" type="submit">Salvar operação</button>
+          <button type="button" id="cancelEditBtn" hidden>Cancelar edição</button>
+          <button class="primary" type="submit" id="saveOperationBtn">Salvar operação</button>
         </div>
       </form>
     </section>
