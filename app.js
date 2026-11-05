@@ -678,6 +678,10 @@ function renderExecution() {
     $("executionSheet").innerHTML = "<p>Nenhuma operação selecionada.</p>";
     return;
   }
+  if ($("executionSheet").classList.contains("landscape")) {
+    renderLandscapePages(op);
+    return;
+  }
   $("executionSheet").innerHTML = `
     <h2>${escapeHtml(op.model_name)}</h2>
     <p>${fmtDateTime(op.starts_at)} até ${fmtDateTime(op.ends_at)} · ${escapeHtml(op.location || "Sem local")}</p>
@@ -702,9 +706,86 @@ function renderExecution() {
   `;
 }
 
+// Pagina a ficha em folhas A4 horizontais, sem cortar textos longos.
+function renderLandscapePages(op) {
+  const sheet = $("executionSheet");
+  sheet.innerHTML = "";
+  const left = [
+    { title: "Equipe", text: (op.people || []).map((p) => `• ${p.name}`).join("\n") || "Nenhuma pessoa escalada." },
+    { title: "Recursos", text: (op.resources || []).filter((r) => r.quantity > 0).map((r) => `• ${r.quantity} - ${r.name}`).join("\n") || "Nenhum recurso." },
+  ];
+  if (!state.hideExecutionWarnings && (op.warnings || []).length) left.push({ title: "Alertas", text: op.warnings.map((w) => w.message).join("\n"), warning: true });
+  if (op.justification) left.push({ title: "Justificativa", text: op.justification });
+  left.push({ title: "Observações gerais", text: op.general_notes || "" });
+  const right = [{ title: "Procedimento operacional", text: op.procedure || "" }];
+  let li = 0, ri = 0, pageCount = 0;
+  // Each block is split only when necessary; all remaining text is carried forward.
+  function fillColumn(column, items, index) {
+    while (index < items.length) {
+      const item = items[index];
+      const block = document.createElement("section");
+      block.className = `a4-block${item.warning ? " a4-warning" : ""}`;
+      const title = document.createElement("strong");
+      title.textContent = item.title;
+      const text = document.createElement("div");
+      text.className = "a4-text";
+      block.append(title, text);
+      column.appendChild(block);
+      text.textContent = item.text;
+      if (column.scrollHeight <= column.clientHeight + 1) { index++; continue; }
+      let lo = 0, hi = item.text.length;
+      while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2);
+        text.textContent = item.text.slice(0, mid);
+        if (column.scrollHeight <= column.clientHeight + 1) lo = mid; else hi = mid - 1;
+      }
+      if (lo < 1) { block.remove(); return index; }
+      let split = lo;
+      if (split < item.text.length) {
+        const boundary = item.text.slice(0, split).search(/\s+\S*$/);
+        if (boundary > 0) split = boundary;
+      }
+      text.textContent = item.text.slice(0, split);
+      items[index] = { ...item, title: `${item.title} (continuação)`, text: item.text.slice(split) };
+      return index;
+    }
+    return index;
+  }
+  function addPage() {
+    const page = document.createElement("div");
+    page.className = "a4-page";
+    const header = document.createElement("header");
+    header.className = "a4-header";
+    const heading = document.createElement("h2"); heading.textContent = op.model_name;
+    const meta = document.createElement("p"); meta.textContent = `${fmtDateTime(op.starts_at)} até ${fmtDateTime(op.ends_at)} · ${op.location || "Sem local"}`;
+    header.append(heading, meta);
+    const columns = document.createElement("div"); columns.className = "a4-columns";
+    const leftColumn = document.createElement("div"), rightColumn = document.createElement("div");
+    leftColumn.className = rightColumn.className = "a4-column";
+    columns.append(leftColumn, rightColumn); page.append(header, columns); sheet.appendChild(page);
+    return [leftColumn, rightColumn];
+  }
+  do {
+    const [leftColumn, rightColumn] = addPage();
+    const oldLi = li, oldRi = ri;
+    const oldLeftText = left[li]?.text, oldRightText = right[ri]?.text;
+    li = fillColumn(leftColumn, left, li);
+    ri = fillColumn(rightColumn, right, ri);
+    pageCount++;
+    if (li === oldLi && ri === oldRi && left[li]?.text === oldLeftText && right[ri]?.text === oldRightText) {
+      // A display with no measurable layout must not cause an infinite loop.
+      sheet.innerHTML = "<p>Não foi possível ajustar a visualização. Abra novamente a aba Execução.</p>";
+      return;
+    }
+  } while (li < left.length || ri < right.length);
+  const scale = Math.min(1, (sheet.clientWidth || 1123) / (297 * 96 / 25.4));
+  sheet.style.setProperty("--a4-scale", scale);
+}
+
 function switchView(view) {
   document.querySelectorAll(".nav").forEach((btn) => btn.classList.toggle("active", btn.dataset.view === view));
   document.querySelectorAll(".view").forEach((el) => el.classList.toggle("active", el.id === `view-${view}`));
+  if (view === "execution") renderExecution();
 }
 
 document.querySelectorAll(".nav").forEach((btn) => btn.addEventListener("click", () => {
@@ -735,7 +816,8 @@ $("toggleLandscape").addEventListener("click", () => {
   const landscape = $("executionSheet").classList.toggle("landscape");
   $("toggleLandscape").textContent = landscape ? "Modo retrato" : "Modo paisagem";
   $("toggleLandscape").setAttribute("aria-pressed", String(landscape));
-  $("printPageOrientation").textContent = `@page { size: A4 ${landscape ? "landscape" : "portrait"}; }`;
+  $("printPageOrientation").textContent = `@page { size: A4 ${landscape ? "landscape; margin: 0" : "portrait"}; }`;
+  renderExecution();
 });
 $("addPersonForm").addEventListener("submit", addPerson);
 $("addModelForm").addEventListener("submit", addModel);

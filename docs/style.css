@@ -406,3 +406,21 @@ label {
   .execution-sheet.landscape .execution-grid { grid-template-columns: 1fr; }
   .execution-sheet.landscape .execution-procedure { margin-top: 18px; }
 }
+
+/* Prévia em páginas com medidas reais de A4 horizontal. */
+.execution-sheet.landscape { padding: 0; border: 0; background: transparent; box-shadow: none; max-width: 100%; }
+.a4-page { box-sizing: border-box; display: flex; flex-direction: column; width: 297mm; height: 210mm; padding: 10mm; background: white; border: 1px solid #d9e0da; box-shadow: 0 5px 20px #0002; margin-bottom: 16px; zoom: var(--a4-scale, 1); color: #17211b; font-size: 10pt; line-height: 1.3; }
+.a4-header { flex: none; border-bottom: 1px solid #d9e0da; padding-bottom: 4mm; margin-bottom: 4mm; }
+.a4-header h2 { font-size: 17pt; margin: 0; }
+.a4-header p { font-size: 9pt; margin: 1mm 0 0; }
+.a4-columns { display: grid; grid-template-columns: 2fr 3fr; gap: 8mm; flex: 1; min-height: 0; }
+.a4-column { min-width: 0; height: 100%; overflow: hidden; }
+.a4-block { margin: 0 0 4mm; overflow-wrap: anywhere; }
+.a4-block strong { display: block; margin-bottom: 1mm; }
+.a4-text { white-space: pre-wrap; }
+.a4-warning { background: #fff5d7; border: 1px solid #ebd28c; border-radius: 4px; padding: 2mm; }
+@media print {
+  .execution-sheet.landscape { padding: 0; }
+  .a4-page { zoom: 1; box-shadow: none; border: 0; margin: 0; break-after: page; page-break-after: always; }
+  .a4-page:last-child { break-after: auto; page-break-after: auto; }
+}
