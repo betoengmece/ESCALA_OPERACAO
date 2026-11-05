@@ -727,6 +727,12 @@ $("toggleExecutionWarnings").addEventListener("click", () => {
   $("toggleExecutionWarnings").setAttribute("aria-pressed", String(state.hideExecutionWarnings));
   renderExecution();
 });
+$("toggleLandscape").addEventListener("click", () => {
+  const landscape = $("executionSheet").classList.toggle("landscape");
+  $("toggleLandscape").textContent = landscape ? "Modo retrato" : "Modo paisagem";
+  $("toggleLandscape").setAttribute("aria-pressed", String(landscape));
+  $("printPageOrientation").textContent = `@page { size: A4 ${landscape ? "landscape" : "portrait"}; }`;
+});
 $("addPersonForm").addEventListener("submit", addPerson);
 $("addModelForm").addEventListener("submit", addModel);
 $("saveApiUrlBtn").addEventListener("click", () => {

@@ -357,6 +357,7 @@ label {
   padding: 26px;
   max-width: 920px;
 }
+.execution-sheet.landscape { max-width: 1250px; }
 .execution-sheet h2 { font-size: 26px; }
 .execution-grid {
   display: grid;
@@ -386,4 +387,5 @@ label {
   .view { display: none !important; }
   #view-execution { display: block !important; }
   .execution-sheet { box-shadow: none; border: 0; max-width: none; }
+  .execution-sheet.landscape .execution-grid { grid-template-columns: 1fr 1fr; }
 }
