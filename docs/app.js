@@ -6,6 +6,7 @@ const state = {
   calculatedResources: [],
   personSchedule: [],
   editingOperationId: null,
+  hideExecutionWarnings: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -690,7 +691,7 @@ function renderExecution() {
         <ul>${op.resources.filter((r) => r.quantity > 0).map((r) => `<li>${r.quantity} - ${escapeHtml(r.name)}</li>`).join("")}</ul>
       </section>
     </div>
-    ${op.warnings.length ? `<div class="warnings">${op.warnings.map((w) => `<div>${escapeHtml(w.message)}</div>`).join("")}</div>` : `<div class="warnings ok">Operação sem alertas.</div>`}
+    ${op.warnings.length ? (state.hideExecutionWarnings ? "" : `<div class="warnings">${op.warnings.map((w) => `<div>${escapeHtml(w.message)}</div>`).join("")}</div>`) : `<div class="warnings ok">Operação sem alertas.</div>`}
     ${op.justification ? `<div class="print-block"><strong>Justificativa</strong>\n${escapeHtml(op.justification)}</div>` : ""}
     <div class="print-block"><strong>Observações gerais</strong>\n${escapeHtml(op.general_notes)}</div>
     <div class="print-block"><strong>Procedimento operacional</strong>\n${escapeHtml(op.procedure)}</div>
@@ -720,6 +721,12 @@ $("filterEnd").addEventListener("change", loadOperations);
 $("filterModel").addEventListener("change", renderAgenda);
 $("filterPerson").addEventListener("change", renderAgenda);
 $("executionSelect").addEventListener("change", renderExecution);
+$("toggleExecutionWarnings").addEventListener("click", () => {
+  state.hideExecutionWarnings = !state.hideExecutionWarnings;
+  $("toggleExecutionWarnings").textContent = state.hideExecutionWarnings ? "Mostrar alertas" : "Ocultar alertas";
+  $("toggleExecutionWarnings").setAttribute("aria-pressed", String(state.hideExecutionWarnings));
+  renderExecution();
+});
 $("addPersonForm").addEventListener("submit", addPerson);
 $("addModelForm").addEventListener("submit", addModel);
 $("saveApiUrlBtn").addEventListener("click", () => {
