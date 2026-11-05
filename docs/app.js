@@ -7,6 +7,8 @@ const state = {
   personSchedule: [],
   editingOperationId: null,
   hideExecutionWarnings: false,
+  landscapeFontSize: 10,
+  landscapeLeftWidth: 40,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -710,6 +712,8 @@ function renderExecution() {
 function renderLandscapePages(op) {
   const sheet = $("executionSheet");
   sheet.innerHTML = "";
+  sheet.style.setProperty("--a4-font-size", `${state.landscapeFontSize}pt`);
+  sheet.style.setProperty("--a4-left-width", `${state.landscapeLeftWidth}%`);
   const left = [
     { title: "Equipe", text: (op.people || []).map((p) => `• ${p.name}`).join("\n") || "Nenhuma pessoa escalada." },
     { title: "Recursos", text: (op.resources || []).filter((r) => r.quantity > 0).map((r) => `• ${r.quantity} - ${r.name}`).join("\n") || "Nenhum recurso." },
@@ -778,6 +782,7 @@ function renderLandscapePages(op) {
       return;
     }
   } while (li < left.length || ri < right.length);
+  $("landscapePageCount").textContent = `${pageCount} ${pageCount === 1 ? "folha" : "folhas"} A4`;
   const scale = Math.min(1, (sheet.clientWidth || 1123) / (297 * 96 / 25.4));
   sheet.style.setProperty("--a4-scale", scale);
 }
@@ -816,9 +821,24 @@ $("toggleLandscape").addEventListener("click", () => {
   const landscape = $("executionSheet").classList.toggle("landscape");
   $("toggleLandscape").textContent = landscape ? "Modo retrato" : "Modo paisagem";
   $("toggleLandscape").setAttribute("aria-pressed", String(landscape));
+  $("landscapeTools").hidden = !landscape;
   $("printPageOrientation").textContent = `@page { size: A4 ${landscape ? "landscape; margin: 0" : "portrait"}; }`;
   renderExecution();
 });
+function updateLandscapeControls() {
+  $("fontSizeLabel").textContent = `${state.landscapeFontSize} pt`;
+  $("columnWidthLabel").textContent = `${state.landscapeLeftWidth}% / ${100 - state.landscapeLeftWidth}%`;
+  $("fontSmaller").disabled = state.landscapeFontSize <= 6;
+  $("fontLarger").disabled = state.landscapeFontSize >= 16;
+  $("columnLeft").disabled = state.landscapeLeftWidth <= 20;
+  $("columnRight").disabled = state.landscapeLeftWidth >= 70;
+  renderExecution();
+}
+$("fontSmaller").addEventListener("click", () => { state.landscapeFontSize = Math.max(6, state.landscapeFontSize - 0.5); updateLandscapeControls(); });
+$("fontLarger").addEventListener("click", () => { state.landscapeFontSize = Math.min(16, state.landscapeFontSize + 0.5); updateLandscapeControls(); });
+$("columnLeft").addEventListener("click", () => { state.landscapeLeftWidth = Math.max(20, state.landscapeLeftWidth - 5); updateLandscapeControls(); });
+$("columnRight").addEventListener("click", () => { state.landscapeLeftWidth = Math.min(70, state.landscapeLeftWidth + 5); updateLandscapeControls(); });
+$("resetLandscape").addEventListener("click", () => { state.landscapeFontSize = 10; state.landscapeLeftWidth = 40; updateLandscapeControls(); });
 $("addPersonForm").addEventListener("submit", addPerson);
 $("addModelForm").addEventListener("submit", addModel);
 $("saveApiUrlBtn").addEventListener("click", () => {

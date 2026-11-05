@@ -409,11 +409,11 @@ label {
 
 /* Prévia em páginas com medidas reais de A4 horizontal. */
 .execution-sheet.landscape { padding: 0; border: 0; background: transparent; box-shadow: none; max-width: 100%; }
-.a4-page { box-sizing: border-box; display: flex; flex-direction: column; width: 297mm; height: 210mm; padding: 10mm; background: white; border: 1px solid #d9e0da; box-shadow: 0 5px 20px #0002; margin-bottom: 16px; zoom: var(--a4-scale, 1); color: #17211b; font-size: 10pt; line-height: 1.3; }
+.a4-page { box-sizing: border-box; display: flex; flex-direction: column; width: 297mm; height: 210mm; padding: 10mm; background: white; border: 1px solid #d9e0da; box-shadow: 0 5px 20px #0002; margin-bottom: 16px; zoom: var(--a4-scale, 1); color: #17211b; font-size: var(--a4-font-size, 10pt); line-height: 1.3; }
 .a4-header { flex: none; border-bottom: 1px solid #d9e0da; padding-bottom: 4mm; margin-bottom: 4mm; }
 .a4-header h2 { font-size: 17pt; margin: 0; }
 .a4-header p { font-size: 9pt; margin: 1mm 0 0; }
-.a4-columns { display: grid; grid-template-columns: 2fr 3fr; gap: 8mm; flex: 1; min-height: 0; }
+.a4-columns { display: grid; grid-template-columns: minmax(0, var(--a4-left-width, 40%)) minmax(0, 1fr); gap: 8mm; flex: 1; min-height: 0; }
 .a4-column { min-width: 0; height: 100%; overflow: hidden; }
 .a4-block { margin: 0 0 4mm; overflow-wrap: anywhere; }
 .a4-block strong { display: block; margin-bottom: 1mm; }
@@ -424,3 +424,10 @@ label {
   .a4-page { zoom: 1; box-shadow: none; border: 0; margin: 0; break-after: page; page-break-after: always; }
   .a4-page:last-child { break-after: auto; page-break-after: auto; }
 }
+
+.landscape-tools:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px; margin-bottom: 16px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+.tool-group { display: flex; align-items: center; gap: 8px; }
+.tool-group button { padding: 6px 10px; }
+#fontSizeLabel, #columnWidthLabel { min-width: 48px; text-align: center; font-size: 13px; }
+#landscapePageCount { color: var(--muted); font-size: 13px; }
+@media print { .landscape-tools { display: none !important; } }
