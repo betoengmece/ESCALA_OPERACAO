@@ -9,6 +9,8 @@ const state = {
   hideExecutionWarnings: false,
   landscapeFontSize: 10,
   landscapeLeftWidth: 40,
+  paperSize: "A4",
+  previewSections: {},
 };
 
 const $ = (id) => document.getElementById(id);
@@ -709,11 +711,24 @@ function renderExecution() {
 }
 
 // Pagina a ficha em folhas A4 horizontais, sem cortar textos longos.
+const PAPER_SIZES = { A4: { width: 297, height: 210, label: "A4" }, OFICIO: { width: 330, height: 216, label: "Ofício" }, A3: { width: 420, height: 297, label: "A3" } };
+function getPreviewSections(op) {
+  return state.previewSections[String(op.id)] || [{ title: "Procedimento operacional", text: op.procedure || "", column: "right" }];
+}
+function setPrintPaper(landscape) {
+  const paper = PAPER_SIZES[state.paperSize];
+  $("printPageOrientation").textContent = landscape
+    ? `@page { size: ${paper.width}mm ${paper.height}mm; margin: 0; }`
+    : "@page { size: A4 portrait; }";
+}
 function renderLandscapePages(op) {
   const sheet = $("executionSheet");
   sheet.innerHTML = "";
   sheet.style.setProperty("--a4-font-size", `${state.landscapeFontSize}pt`);
   sheet.style.setProperty("--a4-left-width", `${state.landscapeLeftWidth}%`);
+  const paper = PAPER_SIZES[state.paperSize];
+  sheet.style.setProperty("--paper-width", `${paper.width}mm`);
+  sheet.style.setProperty("--paper-height", `${paper.height}mm`);
   const left = [
     { title: "Equipe", text: (op.people || []).map((p) => `• ${p.name}`).join("\n") || "Nenhuma pessoa escalada." },
     { title: "Recursos", text: (op.resources || []).filter((r) => r.quantity > 0).map((r) => `• ${r.quantity} - ${r.name}`).join("\n") || "Nenhum recurso." },
@@ -721,7 +736,8 @@ function renderLandscapePages(op) {
   if (!state.hideExecutionWarnings && (op.warnings || []).length) left.push({ title: "Alertas", text: op.warnings.map((w) => w.message).join("\n"), warning: true });
   if (op.justification) left.push({ title: "Justificativa", text: op.justification });
   left.push({ title: "Observações gerais", text: op.general_notes || "" });
-  const right = [{ title: "Procedimento operacional", text: op.procedure || "" }];
+  const right = [];
+  getPreviewSections(op).forEach((section) => (section.column === "left" ? left : right).push({ title: section.title || "Seção", text: section.text || "" }));
   let li = 0, ri = 0, pageCount = 0;
   // Each block is split only when necessary; all remaining text is carried forward.
   function fillColumn(column, items, index) {
@@ -782,8 +798,8 @@ function renderLandscapePages(op) {
       return;
     }
   } while (li < left.length || ri < right.length);
-  $("landscapePageCount").textContent = `${pageCount} ${pageCount === 1 ? "folha" : "folhas"} A4`;
-  const scale = Math.min(1, (sheet.clientWidth || 1123) / (297 * 96 / 25.4));
+  $("landscapePageCount").textContent = `${pageCount} ${pageCount === 1 ? "folha" : "folhas"} ${paper.label}`;
+  const scale = Math.min(1, (sheet.clientWidth || 1123) / (paper.width * 96 / 25.4));
   sheet.style.setProperty("--a4-scale", scale);
 }
 
@@ -810,7 +826,7 @@ $("filterStart").addEventListener("change", loadOperations);
 $("filterEnd").addEventListener("change", loadOperations);
 $("filterModel").addEventListener("change", renderAgenda);
 $("filterPerson").addEventListener("change", renderAgenda);
-$("executionSelect").addEventListener("change", renderExecution);
+$("executionSelect").addEventListener("change", () => { $("sectionEditor").hidden = true; renderExecution(); });
 $("toggleExecutionWarnings").addEventListener("click", () => {
   state.hideExecutionWarnings = !state.hideExecutionWarnings;
   $("toggleExecutionWarnings").textContent = state.hideExecutionWarnings ? "Mostrar alertas" : "Ocultar alertas";
@@ -822,8 +838,68 @@ $("toggleLandscape").addEventListener("click", () => {
   $("toggleLandscape").textContent = landscape ? "Modo retrato" : "Modo paisagem";
   $("toggleLandscape").setAttribute("aria-pressed", String(landscape));
   $("landscapeTools").hidden = !landscape;
-  $("printPageOrientation").textContent = `@page { size: A4 ${landscape ? "landscape; margin: 0" : "portrait"}; }`;
+  $("sectionEditor").hidden = true;
+  setPrintPaper(landscape);
   renderExecution();
+});
+$("paperSize").addEventListener("change", () => {
+  state.paperSize = $("paperSize").value;
+  setPrintPaper(true);
+  renderExecution();
+});
+let sectionDraft = [];
+function selectedExecutionOperation() {
+  return state.operations.find((item) => String(item.id) === $("executionSelect").value) || state.operations[0];
+}
+function readSectionDraft() {
+  return [...document.querySelectorAll("#sectionsList .section-item")].map((item) => ({
+    title: item.querySelector('[data-field="title"]').value,
+    text: item.querySelector('[data-field="text"]').value,
+    column: item.querySelector('[data-field="column"]').value,
+  }));
+}
+function showSectionDraft() {
+  $("sectionsList").innerHTML = sectionDraft.map((item, index) => `
+    <div class="section-item">
+      <div class="section-row">
+        <label>Título <input data-field="title" value="${escapeHtml(item.title)}"></label>
+        <label>Coluna <select data-field="column"><option value="left" ${item.column === "left" ? "selected" : ""}>Esquerda</option><option value="right" ${item.column !== "left" ? "selected" : ""}>Direita</option></select></label>
+        <button type="button" data-remove-section="${index}">Remover</button>
+      </div>
+      <label>Texto <textarea data-field="text" rows="6">${escapeHtml(item.text)}</textarea></label>
+    </div>`).join("");
+}
+$("editSections").addEventListener("click", () => {
+  const op = selectedExecutionOperation();
+  if (!op) { alert("Selecione uma operação."); return; }
+  sectionDraft = getPreviewSections(op).map((item) => ({ ...item }));
+  showSectionDraft();
+  $("sectionEditor").hidden = false;
+});
+$("addSection").addEventListener("click", () => {
+  sectionDraft = readSectionDraft();
+  sectionDraft.push({ title: "Nova seção", text: "", column: "right" });
+  showSectionDraft();
+});
+$("sectionsList").addEventListener("click", (event) => {
+  if (event.target.dataset.removeSection === undefined) return;
+  sectionDraft = readSectionDraft();
+  sectionDraft.splice(Number(event.target.dataset.removeSection), 1);
+  showSectionDraft();
+});
+$("applySections").addEventListener("click", () => {
+  const op = selectedExecutionOperation();
+  if (!op) return;
+  state.previewSections[String(op.id)] = readSectionDraft();
+  $("sectionEditor").hidden = true;
+  renderExecution();
+});
+$("cancelSections").addEventListener("click", () => { $("sectionEditor").hidden = true; });
+$("resetSections").addEventListener("click", () => {
+  const op = selectedExecutionOperation();
+  if (!op) return;
+  sectionDraft = [{ title: "Procedimento operacional", text: op.procedure || "", column: "right" }];
+  showSectionDraft();
 });
 function updateLandscapeControls() {
   $("fontSizeLabel").textContent = `${state.landscapeFontSize} pt`;

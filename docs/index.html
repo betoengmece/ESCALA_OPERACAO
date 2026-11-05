@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Planejamento de Operações</title>
-  <link rel="stylesheet" href="./style.css?v=1.6.0">
+  <link rel="stylesheet" href="./style.css?v=1.7.0">
   <style id="printPageOrientation">@page { size: A4 portrait; }</style>
 </head>
 <body>
@@ -26,8 +26,8 @@
       <button id="uploadCloudSidebarBtn" class="primary" type="button">Enviar para a nuvem</button>
     </div>
     <div class="app-version" aria-label="Versão do sistema">
-      <span>Versão 1.6.0</span>
-      <span>Atualizada em 05/11/2026 às 11:09 (MS)</span>
+      <span>Versão 1.7.0</span>
+      <span>Atualizada em 05/11/2026 às 11:17 (MS)</span>
     </div>
   </aside>
 
@@ -173,13 +173,26 @@
           <span id="columnWidthLabel">40% / 60%</span>
           <button type="button" id="columnRight" aria-label="Mover divisão para a direita">→</button>
         </div>
+        <label>Papel <select id="paperSize"><option value="A4">A4 — 297 × 210 mm</option><option value="OFICIO">Ofício — 330 × 216 mm</option><option value="A3">A3 — 420 × 297 mm</option></select></label>
+        <button type="button" id="editSections">Organizar seções</button>
         <button type="button" id="resetLandscape">Restaurar padrão</button>
         <span id="landscapePageCount" aria-live="polite"></span>
+      </div>
+      <div id="sectionEditor" class="section-editor" hidden>
+        <strong>Organizar o texto da ficha</strong>
+        <p>Divida o procedimento entre as seções e escolha a coluna de cada uma. As mudanças são apenas para esta prévia.</p>
+        <div id="sectionsList"></div>
+        <div class="section-actions">
+          <button type="button" id="addSection">Adicionar seção</button>
+          <button type="button" id="applySections" class="primary">Aplicar à ficha</button>
+          <button type="button" id="cancelSections">Cancelar</button>
+          <button type="button" id="resetSections">Usar texto original</button>
+        </div>
       </div>
       <article id="executionSheet" class="execution-sheet"></article>
     </section>
   </main>
 
-  <script src="./app.js?v=1.6.0"></script>
+  <script src="./app.js?v=1.7.0"></script>
 </body>
 </html>
