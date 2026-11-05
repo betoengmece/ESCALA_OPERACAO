@@ -73,6 +73,7 @@ body.login-page {
 nav { display: grid; gap: 8px; }
 .sidebar-sync { margin-top: 20px; padding-top: 18px; border-top: 1px solid rgba(217, 231, 225, .22); }
 .sidebar-sync button { width: 100%; }
+.app-version { display: grid; gap: 3px; margin-top: 20px; color: #b7c7c0; font-size: 11px; line-height: 1.4; }
 .nav {
   text-align: left;
   border: 0;

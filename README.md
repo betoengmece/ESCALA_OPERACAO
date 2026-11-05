@@ -72,3 +72,7 @@ Depois abra a URL do GitHub Pages. Na primeira tela, cole a URL do Apps Script e
 - Validação de conflito de pessoas, estoque simultâneo de recursos, mínimo de pessoal e equipe incompleta.
 - Justificativa obrigatória para salvar uma operação com alertas.
 - Ficha de execução imprimível.
+
+## Versão exibida no sistema
+
+Em cada atualização do site, atualize a versão e a data/hora no rodapé lateral de `index.html` e `docs/index.html`, no horário de Mato Grosso do Sul. Atualize também o parâmetro `v` dos links de `app.js` e `style.css` nesses arquivos para que o navegador busque os arquivos da nova versão.
