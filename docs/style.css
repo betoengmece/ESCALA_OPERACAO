@@ -358,6 +358,20 @@ label {
   max-width: 920px;
 }
 .execution-sheet.landscape { max-width: 1250px; }
+.execution-sheet.landscape .execution-content {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 28px;
+  align-items: start;
+}
+.execution-sheet.landscape .execution-grid {
+  grid-template-columns: 1fr;
+}
+.execution-sheet.landscape .execution-procedure {
+  margin-top: 18px;
+}
+.execution-sheet.landscape .execution-details,
+.execution-sheet.landscape .execution-procedure { overflow-wrap: anywhere; }
 .execution-sheet h2 { font-size: 26px; }
 .execution-grid {
   display: grid;
@@ -378,6 +392,7 @@ label {
   nav { grid-template-columns: repeat(3, 1fr); }
   .toolbar, .form-grid, .split, .execution-grid, .inline-form, .model-grid, .table-row.editable, .model-resource-row, .add-model-resource, .assignment, .setup-row { grid-template-columns: 1fr; }
   main { padding: 18px; }
+  .execution-sheet.landscape .execution-content { grid-template-columns: 1fr; }
 }
 
 @media print {
@@ -387,5 +402,7 @@ label {
   .view { display: none !important; }
   #view-execution { display: block !important; }
   .execution-sheet { box-shadow: none; border: 0; max-width: none; }
-  .execution-sheet.landscape .execution-grid { grid-template-columns: 1fr 1fr; }
+  .execution-sheet.landscape .execution-content { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+  .execution-sheet.landscape .execution-grid { grid-template-columns: 1fr; }
+  .execution-sheet.landscape .execution-procedure { margin-top: 18px; }
 }

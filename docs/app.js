@@ -681,6 +681,8 @@ function renderExecution() {
   $("executionSheet").innerHTML = `
     <h2>${escapeHtml(op.model_name)}</h2>
     <p>${fmtDateTime(op.starts_at)} até ${fmtDateTime(op.ends_at)} · ${escapeHtml(op.location || "Sem local")}</p>
+    <div class="execution-content">
+    <div class="execution-details">
     <div class="execution-grid">
       <section>
         <h3>Equipe</h3>
@@ -694,7 +696,9 @@ function renderExecution() {
     ${op.warnings.length ? (state.hideExecutionWarnings ? "" : `<div class="warnings">${op.warnings.map((w) => `<div>${escapeHtml(w.message)}</div>`).join("")}</div>`) : `<div class="warnings ok">Operação sem alertas.</div>`}
     ${op.justification ? `<div class="print-block"><strong>Justificativa</strong>\n${escapeHtml(op.justification)}</div>` : ""}
     <div class="print-block"><strong>Observações gerais</strong>\n${escapeHtml(op.general_notes)}</div>
-    <div class="print-block"><strong>Procedimento operacional</strong>\n${escapeHtml(op.procedure)}</div>
+    </div>
+    <div class="print-block execution-procedure"><strong>Procedimento operacional</strong>\n${escapeHtml(op.procedure)}</div>
+    </div>
   `;
 }
 
